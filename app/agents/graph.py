@@ -3,12 +3,7 @@ from langgraph.graph import END, START, StateGraph
 from app.agents.coordinator import coordinator
 from app.agents.state import AgentState
 from app.agents.sql_agent import sql_agent
-
-
-async def document_agent_placeholder(state: AgentState) -> dict:
-    return {
-        "answer": "Document RAG agent is not implemented yet.",
-    }
+from app.agents.document_agent import document_agent
 
 
 async def general_agent(state: AgentState) -> dict:
@@ -29,7 +24,7 @@ builder = StateGraph(AgentState)
 
 builder.add_node("coordinator", coordinator)
 builder.add_node("sql_agent", sql_agent)
-builder.add_node("document_agent", document_agent_placeholder)
+builder.add_node("document_agent", document_agent)
 builder.add_node("general_agent", general_agent)
 
 builder.add_edge(START, "coordinator")
