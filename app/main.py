@@ -1,11 +1,20 @@
 from fastapi import FastAPI
+from .api.routers.chat import router as chat_router
 
-app = FastAPI()
+app = FastAPI(
+    title="دستیار هوشمند مدیریت کتابخانه",
+    version="1.0.0",
+)
+
+app.include_router(
+    chat_router,
+    prefix="/api/v1",
+)
 
 
 @app.get("/")
 async def root():
-    return {"نام_پروژه": "دستیار هوشمند مدیریت کتابخانه مرکزی",
+    return {"نام_پروژه": "دستیار هوشمند مدیریت کتابخانه",
             "توضیحات": "سامانه جامع هوش مصنوعی مبتنی بر معماری چندعاملی (Multi-Agent) برای پاسخ‌گویی به پرسش‌های حقوقی و اداری از روی اسناد و مدیریت تحلیل داده‌های کتابخانه.",
             "قابلیت_های_کلیدی": [
                 "جستجوی معنایی و بازیابی اسناد (RAG) برای آیین‌نامه‌ها و دستورالعمل‌ها",

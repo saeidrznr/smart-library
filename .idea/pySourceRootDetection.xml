@@ -4,6 +4,7 @@
     <option name="sourcePathsSet">
       <set>
         <option value="$PROJECT_DIR$/database" />
+        <option value="$PROJECT_DIR$/app" />
       </set>
     </option>
   </component>
