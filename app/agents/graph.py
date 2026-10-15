@@ -2,12 +2,7 @@ from langgraph.graph import END, START, StateGraph
 
 from app.agents.coordinator import coordinator
 from app.agents.state import AgentState
-
-
-async def sql_agent_placeholder(state: AgentState) -> dict:
-    return {
-        "answer": "SQL agent is not implemented yet.",
-    }
+from app.agents.sql_agent import sql_agent
 
 
 async def document_agent_placeholder(state: AgentState) -> dict:
@@ -33,7 +28,7 @@ def route_question(state: AgentState) -> str:
 builder = StateGraph(AgentState)
 
 builder.add_node("coordinator", coordinator)
-builder.add_node("sql_agent", sql_agent_placeholder)
+builder.add_node("sql_agent", sql_agent)
 builder.add_node("document_agent", document_agent_placeholder)
 builder.add_node("general_agent", general_agent)
 

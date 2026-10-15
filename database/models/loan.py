@@ -4,7 +4,6 @@ from sqlalchemy import (
     CheckConstraint,
     Date,
     ForeignKey,
-    Integer,
     String,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -33,10 +32,6 @@ class Loan(Base):
         CheckConstraint(
             "loan_status IN ('borrowed', 'returned')",
             name="ck_loans_status",
-        ),
-        CheckConstraint(
-            "late_fee_toman >= 0",
-            name="ck_loans_late_fee_nonnegative",
         ),
     )
 
@@ -68,11 +63,6 @@ class Loan(Base):
     due_date: Mapped[date] = mapped_column(
         Date,
         nullable=False,
-    )
-    late_fee_toman: Mapped[int] = mapped_column(
-        Integer,
-        nullable=False,
-        default=0,
     )
 
     member: Mapped["Member"] = relationship(
