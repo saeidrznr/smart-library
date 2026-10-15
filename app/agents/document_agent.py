@@ -1,9 +1,9 @@
-
 from langchain_core.documents import Document
 
 from app.core.llm import llm
 from app.rag.retriever import retrieve_documents
 from app.agents.state import AgentState
+from app.agents.utils import extract_text
 
 
 def format_documents(documents: list[Document]) -> str:
@@ -32,7 +32,6 @@ def format_documents(documents: list[Document]) -> str:
     return "\n\n".join(formatted_documents)
 
 
-
 def build_sources(documents: list[Document]) -> list[dict]:
     """Build structured source references for retrieved documents."""
     sources = []
@@ -50,7 +49,6 @@ def build_sources(documents: list[Document]) -> list[dict]:
             "question_number": metadata.get("question_number"),
         }
 
-        # Remove fields whose values are None
         source = {
             key: value
             for key, value in source.items()
@@ -74,22 +72,28 @@ def build_sources(documents: list[Document]) -> list[dict]:
     return sources
 
 
-
 async def document_agent(state: AgentState) -> dict:
     """Answer library policy questions using retrieved documents."""
+    tool_steps = state.get("tool_steps", 0) + 1
+    execution_log = state.get("execution_log", [])
     question = state["question"]
 
-    documents = retrieve_documents(question, k=4)
+    try:
+        documents = retrieve_documents(question, k=4)
 
-    if not documents:
-        return {
-            "answer": "اطلاعات مرتبطی در اسناد کتابخانه پیدا نشد.",
-            "sources": [],
-        }
+        if not documents:
+            return {
+                "answer": "اطلاعات مرتبطی در اسناد کتابخانه پیدا نشد.",
+                "sources": [],
+                "tool_steps": tool_steps,
+                "execution_log": execution_log + [
+                    "document_agent executed: no documents found"
+                ],
+            }
 
-    context = format_documents(documents)
+        context = format_documents(documents)
 
-    prompt = f"""
+        prompt = f"""
 You are an intelligent library assistant.
 
 Answer the user's question using only the retrieved documents.
@@ -111,9 +115,29 @@ Retrieved documents:
 Answer in Persian:
 """
 
-    response = await llm.ainvoke(prompt)
+        response = await llm.ainvoke(prompt)
+        answer = extract_text(response.content)
 
-    return {
-        "answer": response.text,
-        "sources": build_sources(documents),
-    }
+        return {
+            "answer": answer,
+            "sources": build_sources(documents),
+            "tool_steps": tool_steps,
+            "execution_log": execution_log + [
+                "document_agent executed"
+            ],
+            "agents_used": state.get("agents_used", []) + ["document_agent"],
+        }
+
+    except Exception:
+        return {
+            "answer": (
+                "هنگام جست‌وجو یا پردازش اسناد کتابخانه خطایی رخ داد. "
+                "لطفاً دوباره تلاش کنید."
+            ),
+            "sources": [],
+            "tool_steps": tool_steps,
+            "execution_log": execution_log + [
+                "document_agent failed"
+            ],
+            "agents_used": state.get("agents_used", []) + ["document_agent"]
+        }

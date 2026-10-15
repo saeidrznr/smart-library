@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class SourceReference(BaseModel):
@@ -12,6 +12,8 @@ class SourceReference(BaseModel):
 
 
 class ChatRequest(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
     question: str = Field(
         min_length=1,
         max_length=2000,
@@ -24,3 +26,6 @@ class ChatResponse(BaseModel):
     sources: list[SourceReference] = Field(default_factory=list)
     sql: str | None = None
     data: list[dict] | None = None
+    agents_used: list[str] = Field(default_factory=list)
+    sql_history: list[str] = Field(default_factory=list)
+    execution_log: list[str] = Field(default_factory=list)

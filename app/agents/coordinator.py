@@ -7,12 +7,20 @@ from app.core.llm import llm
 
 
 class RouteDecision(BaseModel):
-    route: Literal["sql", "documents", "general"] = Field(
+    is_final: bool = Field(
         description=(
-            "sql for database questions, "
-            "documents for library document questions, "
-            "general for greetings and general questions"
+            "True if the original question has been fully answered; "
+            "otherwise False."
         )
+    )
+
+    route: Literal[
+        "sql",
+        "documents",
+        "calculator",
+        "general",
+    ] = Field(
+        description="The next agent to execute if is_final is False."
     )
 
 
@@ -20,123 +28,91 @@ router_llm = llm.with_structured_output(RouteDecision)
 
 
 async def coordinator(state: AgentState) -> dict:
-    response = await router_llm.ainvoke(
+    question = state["question"]
+    answer = state.get("answer") or ""
+    data = state.get("data")
+    sources = state.get("sources", [])
+    execution_log = state.get("execution_log", [])
+    tool_steps = state.get("tool_steps", 0)
+
+    # If an agent has already produced a result, decide whether
+    # another step is required instead of blindly repeating it.
+    decision = await router_llm.ainvoke(
         [
             (
                 "system",
 
                 """
                 You are the coordinator of a library assistant.
-
-                Your task is to classify the user's message into exactly one of these routes:
                 
-                - sql
-                - documents
-                - general
+                Choose the next agent to execute, or decide that the task is complete.
                 
-                ## 1. Route: sql
+                Available agents:
+                - sql: retrieve data from the library database.
+                - documents: retrieve facts from library policies and documents.
+                - calculator: perform calculations using the calculator tool.
+                - general: handle greetings and casual conversation.
                 
-                Choose `sql` only when answering the user's question requires retrieving or processing structured data from the library database.
+                ## Decision rules
                 
-                Examples include:
-                - Asking about a specific member's account or membership information.
-                - Checking a member's active loans or borrowing history.
-                - Asking which books a member currently has borrowed.
-                - Checking loan due dates for a specific member or loan.
-                - Checking database-recorded fines or outstanding balances.
-                - Asking for counts or lists of members, loans, or other database records.
+                1. If the original question has been fully answered, set
+                   is_final=True.
                 
-                Use this route only for questions that require database records, not for general explanations of library rules.
+                2. Otherwise, choose the agent that can answer the most important
+                   unanswered part of the question.
                 
-                ## 2. Route: documents
+                3. Use SQL for database facts, documents for library policies,
+                   and calculator for arithmetic.
                 
-                Choose `documents` when the user asks for factual information, explanations, instructions, or guidance related to the library, its services, its rules, or the library assistant, and the answer may be available in indexed documents.
+                4. For multi-part questions, process each required part separately.
+                   For example, a question asking for an overdue-loan percentage
+                   and the applicable fine may require SQL, documents, and calculator.
                 
-                This includes, but is not limited to:
+                5. Review the execution history and existing results before choosing
+                   an agent. Reuse valid results and do not repeat completed work
+                   unless the existing result is insufficient.
                 
-                ### Library information
-                - The library's name, purpose, facilities, services, and opening hours.
-                - Information about the library and its general operations.
-                - Questions about the library's environment and study spaces.
+                6. If SQL data is available and only a calculation remains, choose
+                   calculator, not SQL.
                 
-                ### Rules and policies
-                - Borrowing periods, renewals, reservations, and returns.
-                - Late fees and borrowing restrictions defined by library policies.
-                - Study room rules, silence, seating, equipment, and cleanliness.
-                - Any other library regulations or frequently asked questions.
+                7. Never invent missing facts or claim that a task was completed
+                   without supporting results.
                 
-                ### Library assistant information
-                - The role and purpose of the library assistant.
-                - What the assistant can do.
-                - The assistant's capabilities and limitations.
-                - How the assistant works and where it obtains information.
-                - Whether the assistant can access member records or borrowing information.
-                - How users should interact with the assistant.
+                8. If no useful step remains, finalize the response and clearly
+                   explain any unanswered part.
                 
-                Examples:
-                - "What is the role of the library assistant?"
-                - "What does this bot do?"
-                - "What services does the library offer?"
-                - "How many days can I borrow a book?"
-                - "What is the late return fee?"
-                - "چند روز می‌تونم کتاب امانت بگیرم؟"
-                - "نقش دستیار کتابخونه چیه؟"
-                - "این ربات چه کارهایی انجام می‌ده؟"
-                - "کتابخونه چه امکاناتی داره؟"
-                - "ربات چطور جواب سؤال‌ها رو پیدا می‌کنه؟"
-                
-                If a question concerns library-specific facts, do not choose `general` merely because the question is short, informal, conversational, or phrased in Persian colloquial language.
-                
-                If the user asks about the library assistant's capabilities, role, or limitations, choose `documents` when this information may be available in library documents.
-                
-                If a question asks about a specific member's actual records, loans, or account status, choose `sql` instead.
-                
-                ## 3. Route: general
-                
-                Choose `general` ONLY for conversational messages that do not request factual information, explanations, or actions related to the library or its database.
-                
-                This route is limited to:
-                - Greetings: "Hi", "Hello", "سلام", "درود".
-                - Well-being questions used only as social greetings: "How are you?", "حالت چطوره؟", "خوبی؟"
-                - Brief social responses: "I'm fine, thanks", "خوبم، ممنون".
-                - Simple expressions of gratitude: "Thanks", "ممنون", "مرسی".
-                - Polite conversational closings: "Goodbye", "خداحافظ".
-                - Similar short social pleasantries that do not contain a substantive question.
-                
-                Do NOT choose `general` if the user asks for information about the library, its policies, its services, the assistant, or any library-related topic.
-                
-                A message containing a greeting followed by a substantive question must be classified according to the substantive question, not as `general`.
-                
-                Examples:
-                - "سلام" → `general`
-                - "حالت چطوره؟" → `general`
-                - "ممنون" → `general`
-                - "سلام، چند روز می‌تونم کتاب امانت بگیرم؟" → `documents`
-                - "سلام، نقش دستیار کتابخونه چیه؟" → `documents`
-                - "این ربات چه امکاناتی داره؟" → `documents`
-                - "می‌تونی وضعیت امانت‌های من رو بررسی کنی؟" → `sql`
-                
-                ## 4. Routing priority
-                
-                Apply these rules in order:
-                
-                1. If the user asks about specific database records or a database-dependent operation, choose `sql`.
-                2. Otherwise, if the message requests factual information or assistance related to the library, its policies, services, or assistant, choose `documents`.
-                3. Choose `general` only if the message is purely social conversation and does not contain a substantive information request.
-                4. If uncertain whether a library-related question belongs to `sql` or `documents`, choose `documents`, unless the answer clearly requires specific database records.
-                
-                ## 5. Output requirements
-                
-                - Do not answer the user's question.
-                - Do not explain your classification.
-                - Return exactly one lowercase word:
-                  `sql`, `documents`, or `general`.
-                - Do not include punctuation, markdown, or any additional text.
+                Return only the structured decision:
+                - is_final: whether the original question is sufficiently answered.
+                - route: the next agent, ignored when is_final=True.
                 """
                 ,
             ),
-            ("human", state["question"]),
+            (
+                "human",
+                f"""
+Original question:
+{question}
+
+Current answer:
+{answer}
+
+SQL result:
+{data}
+
+Sources:
+{sources}
+
+Execution history:
+{execution_log}
+
+Steps executed:
+{tool_steps}
+""",
+            ),
         ]
     )
 
-    return {"route": response.route}
+    return {
+        "is_final": decision.is_final,
+        "route": decision.route,
+    }
