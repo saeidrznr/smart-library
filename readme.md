@@ -32,13 +32,11 @@ Run the following commands in **PowerShell**.
 ### 1. Clone the Repository
 
 ```powershell
-git clone <YOUR_GITHUB_REPOSITORY_URL>
+git clone https://github.com/saeidrznr/smart-library
 cd smart-library
 ```
 
-Replace `<YOUR_GITHUB_REPOSITORY_URL>` with the actual GitHub repository URL.
-
-### 2. Configure Environment Variables
+[### 2. ](https://github.com/saeidrznr/smart-library)Configure Environment Variables
 
 Create a `.env` file in the project root, using `.env.example` as a template.
 
@@ -53,8 +51,6 @@ GEMINI_API_KEY=your_gemini_api_key
 ```
 
 Replace `your_password` and `your_gemini_api_key` with your own values. Ensure that the database credentials in `DATABASE_URL` match `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB`.
-
-**Important:** When the application runs inside Docker Compose, use `db` as the PostgreSQL hostname. Never commit `.env` or API keys to GitHub.
 
 ### 3. Build and Start the Containers
 
@@ -98,7 +94,7 @@ Run the database seeding script inside the application container:
 docker compose exec app python -m scripts.seed_database
 ```
 
-This initializes the database with the project's sample data. Run this step after PostgreSQL is ready.
+This initializes the database with the project's sample data. Run this step after the migrations have been applied and PostgreSQL is ready.
 
 ### 5. Index the Documents
 
@@ -131,24 +127,6 @@ Open the interactive API documentation:
 - **Swagger UI:** http://127.0.0.1:8000/docs
 - **Chat API:** `POST http://127.0.0.1:8000/chat`
 
-To test the API through Swagger UI:
-
-1. Open http://127.0.0.1:8000/docs.
-2. Expand `POST /chat`.
-3. Click **Try it out**.
-4. Enter the following request body.
-5. Click **Execute**.
-
-```json
-{
-  "question": "نام اعضایی که حداقل یک امانت معوق دارند چیست؟"
-}
-```
-
-The API response should contain the assistant's answer and relevant execution details.
-
-A valid Gemini API key and available API quota are required for model-based requests.
-
 ## API Usage
 
 Send a `POST` request to `/chat` with a JSON body.
@@ -159,20 +137,6 @@ Send a `POST` request to `/chat` with a JSON body.
 {
   "question": "نام اعضایی که حداقل یک امانت معوق دارند چیست؟"
 }
-```
-
-### Example Using PowerShell
-
-```powershell
-$body = @{
-    question = "نام اعضایی که حداقل یک امانت معوق دارند چیست؟"
-} | ConvertTo-Json
-
-Invoke-RestMethod `
-    -Uri "http://127.0.0.1:8000/chat" `
-    -Method Post `
-    -ContentType "application/json" `
-    -Body $body
 ```
 
 ## Example Scenarios and Outputs
@@ -208,7 +172,7 @@ The following examples illustrate the application's main workflows. Actual answe
 }
 ```
 
-The `data` array is abbreviated for readability.
+The `data` array is abbreviated for readability. Use actual output from the running application when documenting test results.
 
 ### 2. Document Question Answering (RAG)
 
@@ -280,9 +244,6 @@ This example demonstrates a workflow that retrieves data using SQL and then uses
   ]
 }
 ```
-
-These examples illustrate the expected response structure. Verify exact response values against the current implementation and database contents.
-
 ## Tests
 
 The repository includes component tests and integration scenarios. Run the following commands from the project root in PowerShell while the application container is running.
@@ -307,15 +268,7 @@ Run the integration scenarios:
 docker compose exec app pytest -v test_integerated.py
 ```
 
-The integration script is expected to write its results to `scenario_results.json` if its implementation performs that file-writing step.
-
-Before running tests, ensure that:
-
-- Both containers are running.
-- The database has been initialized.
-- The document index has been created for RAG scenarios.
-- `.env` contains a valid Gemini API key.
-- The required Python test dependencies are installed in the image.
+Check `scenario_results.json` for the scenario results if the integration script writes its results to that file.
 
 ## Container Management
 
@@ -355,12 +308,11 @@ docker compose down -v
 
 ## Limitations
 
-- Gemini responses depend on external API availability, rate limits, and quota.
-- Document-answering quality depends on the source documents, chunking, embeddings, and retrieval configuration.
-- NL2SQL accuracy depends on the database schema, generated SQL, and available data.
-- The document index must be created before document-based queries and refreshed when source documents change.
-- Test outcomes can depend on external API access and the current database state.
-
+- No authentication: The API does not implement user authentication or access control.
+- Responses depend on Google Gemini API availability and quota.
+- RAG quality depends on document retrieval and the quality of the source documents.
+- NL2SQL accuracy depends on the generated SQL and the available database data.
+- Documents must be indexed before using the RAG functionality.
 ## Technology Stack
 
 | Component | Technology |
