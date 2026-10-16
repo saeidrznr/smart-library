@@ -6,27 +6,28 @@ An AI-powered library assistant built with **FastAPI, LangGraph, PostgreSQL, Chr
 
 - **NL2SQL Agent:** Answers questions about library members, books, and loans using PostgreSQL.
 - **Document RAG Agent:** Retrieves relevant information from library documents using ChromaDB.
-- **Calculator Agent:** Performs arithmetic operations and supports multi-step calculations.
+- **Calculator Agent:** Performs arithmetic and multi-step calculations.
 - **Coordinator Agent:** Routes user questions to the appropriate agent using LangGraph.
-- **General Agent:** Handles greetings and general queries outside specialized workflows.
-- **FastAPI:** Provides an HTTP API for interacting with the assistant.
+- **General Agent:** Handles greetings and general queries.
+- **FastAPI:** Exposes an HTTP API for interacting with the assistant.
 
 ## Architecture
 
+LangGraph coordinates specialized agents. PostgreSQL stores structured library data, while ChromaDB stores document embeddings for semantic retrieval. Google Gemini provides language-model capabilities through its API.
 
 <p align="center">
   <img src="reports/architecture.png" alt="System Architecture" width="700">
 </p>
 
-
 ## Requirements
 
-- Python 3.10+
-- Docker and Docker Compose
-- Google Gemini API key
 - Git
+- Docker Desktop with Docker Compose
+- A Google Gemini API key
 
 ## Setup and Run
+
+Run the following commands in **PowerShell**.
 
 ### 1. Clone the Repository
 
@@ -35,32 +36,32 @@ git clone <YOUR_GITHUB_REPOSITORY_URL>
 cd smart-library
 ```
 
-### 2. Create a Virtual Environment
+Replace `<YOUR_GITHUB_REPOSITORY_URL>` with the actual GitHub repository URL.
 
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+### 2. Configure Environment Variables
+
+Create a `.env` file in the project root, using `.env.example` as a template.
+
+Configure the required values:
+
+```env
+POSTGRES_DB=library_db
+POSTGRES_USER=library_user
+POSTGRES_PASSWORD=your_password
+DATABASE_URL=postgresql+asyncpg://library_user:your_password@db:5432/library_db
+GEMINI_API_KEY=your_gemini_api_key
 ```
 
-### 3. Configure Environment Variables
+Replace `your_password` and `your_gemini_api_key` with your own values. Ensure that the database credentials in `DATABASE_URL` match `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB`.
 
-Create a `.env` file based on `.env.example` and configure the required environment variables, including:
+**Important:** When the application runs inside Docker Compose, use `db` as the PostgreSQL hostname. Never commit `.env` or API keys to GitHub.
 
-- Google Gemini API key
-- PostgreSQL connection URL
-- Any additional settings required by the application
+### 3. Build and Start the Containers
 
-Use the variable names and formats defined in `.env.example`.
-
-**Never commit `.env` or API keys to GitHub.**
-
-### 4. Start PostgreSQL with Docker
-
-Start the PostgreSQL service:
+Build the application image and start FastAPI and PostgreSQL:
 
 ```powershell
-docker compose up -d
+docker compose up --build -d
 ```
 
 Check the container status:
@@ -69,41 +70,74 @@ Check the container status:
 docker compose ps
 ```
 
-Ensure the database connection URL in `.env` matches the PostgreSQL configuration in the Compose file.
+Both the `app` and `db` services should be running. PostgreSQL must pass its health check before the application can start.
 
-Initialize the database schema and sample data using the project's configured initialization procedure before running database-related scenarios.
+If the application fails to start, inspect its logs:
+
+```powershell
+docker compose logs --tail=100 app
+```
+
+To follow the application logs continuously, press `Ctrl+C` to stop following them:
+
+```powershell
+docker compose logs -f app
+```
+
+For PostgreSQL logs:
+
+```powershell
+docker compose logs --tail=100 db
+```
+
+### 4. Initialize the Database
+
+Run the database seeding script inside the application container:
+
+```powershell
+docker compose exec app python -m scripts.seed_database
+```
+
+This initializes the database with the project's sample data. Run this step after PostgreSQL is ready.
 
 ### 5. Index the Documents
 
-Place the source documents in the configured documents directory, then run:
+Run the document indexing script inside the application container:
 
 ```powershell
-python index_documents.py
+docker compose exec app python index_documents.py
 ```
 
-The indexing script loads the documents, splits them into chunks, generates embeddings, and stores them in ChromaDB.
+The script processes the configured source documents, splits them into chunks, generates embeddings, and stores them in ChromaDB.
 
-Run this step before testing document-question-answering scenarios. Re-run the script whenever the indexed documents need to be added or updated.
+Run this step before using document-based question answering. Re-run it whenever the indexed documents need to be updated.
 
-### 6. Start the API
+### 6. Run and Verify the Application
+
+If the containers are already running, the API should be accessible. Otherwise, start the existing services with:
 
 ```powershell
-uvicorn app.main:app --reload
+docker compose up -d
 ```
 
-The API will be available at:
+Check the status:
 
-`http://127.0.0.1:8000`
+```powershell
+docker compose ps
+```
 
-Interactive API documentation:
+Open the interactive API documentation:
 
-`http://127.0.0.1:8000/docs`
+- **Swagger UI:** http://127.0.0.1:8000/docs
+- **Chat API:** `POST http://127.0.0.1:8000/chat`
 
-## API Usage
+To test the API through Swagger UI:
 
-Send a `POST` request to `/chat` with a JSON body.
-
-**Example request:**
+1. Open http://127.0.0.1:8000/docs.
+2. Expand `POST /chat`.
+3. Click **Try it out**.
+4. Enter the following request body.
+5. Click **Execute**.
 
 ```json
 {
@@ -111,7 +145,23 @@ Send a `POST` request to `/chat` with a JSON body.
 }
 ```
 
-**Example using PowerShell:**
+The API response should contain the assistant's answer and relevant execution details.
+
+A valid Gemini API key and available API quota are required for model-based requests.
+
+## API Usage
+
+Send a `POST` request to `/chat` with a JSON body.
+
+### Example Request
+
+```json
+{
+  "question": "نام اعضایی که حداقل یک امانت معوق دارند چیست؟"
+}
+```
+
+### Example Using PowerShell
 
 ```powershell
 $body = @{
@@ -125,32 +175,191 @@ Invoke-RestMethod `
     -Body $body
 ```
 
-The response contains the assistant's answer and may include additional information such as retrieved sources, generated SQL, or query results, depending on the executed workflow.
+## Example Scenarios and Outputs
 
-## Integration Tests and Scenarios
+The following examples illustrate the application's main workflows. Actual answers depend on the database contents, indexed documents, and model responses.
 
-The integration-test scenarios are defined in `test_integerated.py`. They cover the project's main workflows, including document retrieval, NL2SQL, calculations, and other supported scenarios.
+### 1. Structured Data Query (NL2SQL)
 
-Run the tests with:
+**Request:**
 
-```powershell
-pytest -v test_integerated.py
+```json
+{
+  "question": "برای هر وضعیت امانت، تعداد امانت‌ها و نام اعضایی که آن امانت‌ها را دریافت کرده‌اند نمایش بده."
+}
 ```
 
-If the file is designed to run as a standalone script, use:
+**Example response:**
 
-```powershell
-python test_integerated.py
+```json
+{
+  "answer": "بر اساس اطلاعات موجود در سیستم، جزئیات امانت‌ها به تفکیک وضعیت نمایش داده می‌شود.",
+  "sources": [],
+  "sql": "SELECT l.loan_status AS loan_status, COUNT(l.id) AS loan_count, m.full_name AS member_name FROM loans l INNER JOIN members m ON l.member_id = m.id GROUP BY l.loan_status, m.full_name",
+  "data": [
+    {
+      "loan_status": "borrowed",
+      "loan_count": 2,
+      "member_name": "امیر جعفری"
+    }
+  ],
+  "agents_used": ["sql_agent"],
+  "execution_log": ["sql_agent executed"]
+}
 ```
 
-**Test results are saved in `scenario_results.json`.**
+The `data` array is abbreviated for readability.
 
-Before running the scenarios, ensure that:
+### 2. Document Question Answering (RAG)
 
-- PostgreSQL is running and initialized.
-- The `.env` file contains valid configuration.
-- The ChromaDB document index has been created.
-- The Google Gemini API key is valid and the API quota is sufficient.
+**Request:**
+
+```json
+{
+  "question": "برای تمدید امانت کتاب چه شرایطی باید رعایت شود؟"
+}
+```
+
+**Example response:**
+
+```json
+{
+  "answer": "تمدید امانت به شرایطی مانند نبود رزرو فعال، نداشتن بدهی معوق و رعایت محدودیت تعداد دفعات تمدید بستگی دارد.",
+  "sources": [
+    {
+      "source": "پرسش و پاسخ.pdf",
+      "section": "بخش سوم ـ تمدید امانت منابع",
+      "chunk_type": "faq"
+    },
+    {
+      "source": "قوانین امانت.pdf",
+      "section": "ماده ۲ ـ شرایط امانت منابع",
+      "chunk_type": "article_clause"
+    }
+  ],
+  "sql": null,
+  "data": null,
+  "agents_used": ["document_agent"],
+  "execution_log": ["document_agent executed"]
+}
+```
+
+### 3. Agent and Tool Workflow
+
+This example demonstrates a workflow that retrieves data using SQL and then uses the calculator agent to calculate a percentage.
+
+**Request:**
+
+```json
+{
+  "question": "چند درصد از کل امانت‌ها برگشت داده شده‌اند؟ نتیجه را تا دو رقم اعشار بیان کن."
+}
+```
+
+**Example response:**
+
+```json
+{
+  "answer": "۲۰.۰۰ درصد از کل امانت‌ها برگشت داده شده‌اند.",
+  "sources": [],
+  "sql": "SELECT COUNT(CASE WHEN loan_status = 'returned' THEN 1 END) AS returned_loans_count, COUNT(*) AS total_loans_count FROM loans",
+  "data": [
+    {
+      "returned_loans_count": 5,
+      "total_loans_count": 25
+    }
+  ],
+  "agents_used": [
+    "sql_agent",
+    "calculator_agent"
+  ],
+  "execution_log": [
+    "sql_agent executed",
+    "calculator tool called: (5 / 25) * 100",
+    "calculator_agent executed"
+  ]
+}
+```
+
+These examples illustrate the expected response structure. Verify exact response values against the current implementation and database contents.
+
+## Tests
+
+The repository includes component tests and integration scenarios. Run the following commands from the project root in PowerShell while the application container is running.
+
+### Component Tests
+
+```powershell
+docker compose exec app pytest -v test_coodinator.py
+docker compose exec app pytest -v test_graph.py
+docker compose exec app pytest -v test_llm_connect.py
+docker compose exec app pytest -v test_sql_agent.py
+docker compose exec app pytest -v test_sql_executer.py
+```
+
+These tests cover the coordinator, graph workflow, LLM connectivity, SQL agent, and SQL execution components.
+
+### Integration Scenarios
+
+Run the integration scenarios:
+
+```powershell
+docker compose exec app pytest -v test_integerated.py
+```
+
+The integration script is expected to write its results to `scenario_results.json` if its implementation performs that file-writing step.
+
+Before running tests, ensure that:
+
+- Both containers are running.
+- The database has been initialized.
+- The document index has been created for RAG scenarios.
+- `.env` contains a valid Gemini API key.
+- The required Python test dependencies are installed in the image.
+
+## Container Management
+
+### Stop the Containers
+
+```powershell
+docker compose stop
+```
+
+### Start the Stopped Containers Again
+
+```powershell
+docker compose start
+```
+
+### Restart the Application
+
+```powershell
+docker compose restart app
+```
+
+### Stop and Remove the Containers
+
+```powershell
+docker compose down
+```
+
+This removes the containers and network but preserves the PostgreSQL named volume.
+
+To also delete the PostgreSQL volume and its stored data:
+
+```powershell
+docker compose down -v
+```
+
+**Warning:** The `-v` option permanently deletes the PostgreSQL volume and its stored data.
+
+## Limitations
+
+- Gemini responses depend on external API availability, rate limits, and quota.
+- Document-answering quality depends on the source documents, chunking, embeddings, and retrieval configuration.
+- NL2SQL accuracy depends on the database schema, generated SQL, and available data.
+- The document index must be created before document-based queries and refreshed when source documents change.
+- Test outcomes can depend on external API access and the current database state.
 
 ## Technology Stack
 
@@ -160,12 +369,13 @@ Before running the scenarios, ensure that:
 | Agent orchestration | LangGraph |
 | Language model | Google Gemini |
 | Structured database | PostgreSQL |
-| Document vector store | ChromaDB |
+| Vector database | ChromaDB |
 | Language | Python |
+| Containerization | Docker Compose |
 
-## Notes
+## Security Notes
 
-- PostgreSQL stores structured library data, while ChromaDB stores document embeddings.
-- The document index must be initialized before document-based queries can be answered.
-- LLM requests depend on external API availability and quota.
-- Keep credentials and other secrets out of version control.
+- Keep `.env` and API keys out of version control.
+- Use `.env.example` to document required configuration without including secrets.
+- Use secure database credentials for deployments beyond local development.
+- If an API key has been exposed, revoke it and replace it with a new key.
