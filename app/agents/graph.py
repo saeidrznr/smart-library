@@ -20,7 +20,7 @@ async def general_agent(state: AgentState) -> dict:
     }
 
 
-MAX_STEPS = 5
+MAX_STEPS = 3
 
 
 def route_question(state: AgentState) -> str:
@@ -33,18 +33,35 @@ def route_question(state: AgentState) -> str:
     return state["route"]
 
 
+
 async def step_limit_agent(state: AgentState) -> dict:
-    return {
-        "answer": (
+    answer = state.get("answer")
+    tool_steps = state.get("tool_steps", 0)
+    execution_log = state.get("execution_log", [])
+
+    if tool_steps >= MAX_STEPS:
+        message = (
             "برای تکمیل درخواست، محدودیت تعداد مراحل اجرا "
             "رسید. لطفاً درخواست را ساده‌تر یا به چند بخش "
             "تقسیم کنید."
-        ),
+        )
+        log_entry = "step_limit_reached"
+
+    elif not isinstance(answer, str) or not answer.strip():
+        message = (
+            "متأسفم، نتوانستم پاسخ معتبری برای این سؤال تولید کنم. "
+            "لطفاً سؤال خود را درباره خدمات و اطلاعات کتابخانه مطرح کنید."
+        )
+        log_entry = "empty_answer_fallback"
+
+    else:
+        message = answer
+        log_entry = "step_limit_agent_executed"
+
+    return {
+        "answer": message,
         "is_final": True,
-        "execution_log": (
-                state.get("execution_log", [])
-                + ["step_limit_reached"]
-        ),
+        "execution_log": execution_log + [log_entry],
     }
 
 
