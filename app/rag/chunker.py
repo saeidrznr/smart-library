@@ -23,7 +23,7 @@ SECTION_PATTERN = re.compile(
 
 def normalize_text(text: str) -> str:
     """Normalize Persian text while preserving line boundaries."""
-    text = text.replace("---", "").replace("ؤ", "و").replace("ئ", "ی").replace("ي", "ی").replace("ك", "ک")
+    text = text.replace("---", "").replace("ؤ", "و").replace("ي", "ی").replace("ك", "ک")
     text = text.replace("\r\n", "\n").replace("\r", "\n")
     text = re.sub(r"[ \t]+", " ", text)
     text = re.sub(r"\n{3,}", "\n\n", text)
@@ -181,8 +181,7 @@ def chunk_faq_document(
         )
 
         question_number = match.group(1)
-        question_text = text[match.end():].split("\n", 1)[0].strip()
-        answer_text = text[match.end():end].strip()
+        question_and_answer_text = text[match.end():end].strip()
 
         # Include the nearest preceding section heading, if present.
         section_title = None
@@ -195,8 +194,8 @@ def chunk_faq_document(
         if section_title:
             parts.append(section_title)
 
-        if answer_text:
-            parts.append(answer_text)
+        if question_and_answer_text:
+            parts.append(question_and_answer_text)
 
         chunks.append(
             Document(

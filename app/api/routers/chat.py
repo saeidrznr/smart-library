@@ -34,7 +34,6 @@ async def chat(request: ChatRequest) -> ChatResponse:
                 "data": None,
                 "sources": [],
                 "is_final": False,
-                "messages": [],
                 "execution_log": [],
                 "tool_steps": 0,
                 "sql_history": [],

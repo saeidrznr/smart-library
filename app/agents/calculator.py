@@ -8,7 +8,9 @@ _ALLOWED_OPERATORS = {
     ast.Add: operator.add,
     ast.Sub: operator.sub,
     ast.Mult: operator.mul,
-    ast.Div: operator.truediv
+    ast.Div: operator.truediv,
+    ast.UAdd: operator.pos,
+    ast.USub: operator.neg,
 }
 
 
@@ -29,9 +31,6 @@ def _evaluate(node):
 
         left = _evaluate(node.left)
         right = _evaluate(node.right)
-
-        if isinstance(node.op, ast.Pow) and abs(right) > 10:
-            raise ValueError("Exponent is too large.")
 
         result = operation(left, right)
 
@@ -61,9 +60,6 @@ def calculator(expression: str) -> str:
     if len(expression) > 200:
         return "Error: expression is too long."
     try:
-        if len(expression) > 200:
-            return "Error: expression is too long."
-
         tree = ast.parse(expression, mode="eval")
         result = _evaluate(tree.body)
         return str(result)

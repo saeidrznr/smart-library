@@ -33,7 +33,6 @@ async def coordinator(state: AgentState) -> dict:
     data = state.get("data")
     sources = state.get("sources", [])
     execution_log = state.get("execution_log", [])
-    tool_steps = state.get("tool_steps", 0)
 
     # If an agent has already produced a result, decide whether
     # another step is required instead of blindly repeating it.
@@ -101,9 +100,6 @@ Sources:
 
 Execution history:
 {execution_log}
-
-Steps executed:
-{tool_steps}
 """,
             ),
         ]

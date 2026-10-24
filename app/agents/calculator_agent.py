@@ -7,9 +7,9 @@ from app.agents.utils import extract_text
 
 calculator_llm = llm.bind_tools([calculator])
 
-
 async def calculator_agent(state: AgentState) -> dict:
-    tool_steps = state.get("tool_steps", 0) + 1
+    print(f"calculator_agent: {state}")
+    agent_steps = state.get("agent_steps", 0) + 1
     execution_log = list(state.get("execution_log", []))
     agents_used = list(state.get("agents_used", []))
 
@@ -17,20 +17,20 @@ async def calculator_agent(state: AgentState) -> dict:
         "sql": state.get("sql"),
         "data": state.get("data"),
         "sources": state.get("sources", []),
-        "tool_steps": tool_steps,
+        "agent_steps": agent_steps,
     }
 
     try:
         data = state.get("data")
 
-        if not data:
-            return {
-                **base_result,
-                "answer": "اطلاعات کافی برای انجام محاسبه در دسترس نیست.",
-                "execution_log": execution_log
-                + ["calculator_agent skipped: missing database data"],
-                "agents_used": agents_used + ["calculator_agent"],
-            }
+        # if not data:
+        #     return {
+        #         **base_result,
+        #         "answer": "اطلاعات کافی برای انجام محاسبه در دسترس نیست.",
+        #         "execution_log": execution_log
+        #                          + ["calculator_agent skipped: missing database data"],
+        #         "agents_used": agents_used + ["calculator_agent"],
+        #     }
 
         messages = [
             SystemMessage(
@@ -43,7 +43,7 @@ async def calculator_agent(state: AgentState) -> dict:
 قوانین الزامی:
 ۱. برای هر محاسبه حتماً ابزار calculator را فراخوانی کنید.
 ۲. هرگز محاسبه را ذهنی انجام ندهید و نتیجه را حدس نزنید.
-۳. فقط از مقادیر موجود در نتایج پایگاه داده استفاده کنید.
+۳. محاسبات میتواند از سوال کاربر به صورت مستقیم باشد.
 ۴. نام هر فیلد را دقیقاً بررسی کنید تا مقدار مربوط به هر کمیت
    را با مقدار کمیت دیگری اشتباه نگیرید.
 ۵. اگر داده‌های لازم موجود نیستند یا ارتباط مقادیر با سؤال
@@ -86,7 +86,7 @@ async def calculator_agent(state: AgentState) -> dict:
                     "فراخوانی نشده است."
                 ),
                 "execution_log": execution_log
-                + ["calculator tool was not called"],
+                                 + ["calculator tool was not called"],
                 "agents_used": agents_used + ["calculator_agent"],
             }
 
@@ -98,12 +98,12 @@ async def calculator_agent(state: AgentState) -> dict:
             if not expression:
                 continue
 
-            execution_log.append(
-                f"calculator tool called: {expression}"
-            )
-
             result = await calculator.ainvoke(
                 {"expression": expression}
+            )
+
+            execution_log.append(
+                f"calculator tool called: {expression} = {result}"
             )
 
             tool_results.append(str(result))
@@ -121,7 +121,7 @@ async def calculator_agent(state: AgentState) -> dict:
                 **base_result,
                 "answer": "ابزار ماشین‌حساب نتیجه‌ای ارائه نکرد.",
                 "execution_log": execution_log
-                + ["calculator returned no result"],
+                                 + ["calculator returned no result"],
                 "agents_used": agents_used + ["calculator_agent"],
             }
 
@@ -141,8 +141,7 @@ async def calculator_agent(state: AgentState) -> dict:
         return {
             **base_result,
             "answer": extract_text(final_response.content),
-            "execution_log": execution_log
-            + ["calculator_agent executed"],
+            "execution_log": execution_log,
             "agents_used": agents_used + ["calculator_agent"],
         }
 
@@ -151,6 +150,6 @@ async def calculator_agent(state: AgentState) -> dict:
             **base_result,
             "answer": "در انجام محاسبه خطایی رخ داد.",
             "execution_log": execution_log
-            + [f"calculator_agent failed: {type(exc).__name__}"],
+                             + [f"calculator_agent failed: {type(exc).__name__}"],
             "agents_used": agents_used + ["calculator_agent"],
         }

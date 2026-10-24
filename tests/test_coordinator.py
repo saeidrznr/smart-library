@@ -18,13 +18,13 @@ from app.agents.graph import graph
     ],
 )
 async def test_coordinator_routes_correctly(
-    question: str,
-    expected_route: str,
-    monkeypatch,
+        question: str,
+        expected_route: str,
+        monkeypatch,
 ):
     class FakeRouter:
         async def ainvoke(self, messages):
-            return RouteDecision(route=expected_route)
+            return RouteDecision(route=expected_route, is_final=False)
 
     monkeypatch.setattr(
         coordinator_module,

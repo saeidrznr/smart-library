@@ -31,11 +31,19 @@ def format_documents(documents: list[Document]) -> str:
 
     return "\n\n".join(formatted_documents)
 
+def source_key(source: dict) -> tuple:
+    return (
+        source.get("source"),
+        source.get("page"),
+        source.get("section"),
+        source.get("clause_number"),
+        source.get("question_number"),
+    )
 
-def build_sources(documents: list[Document]) -> list[dict]:
+
+def build_sources(sources: list[dict], documents: list[Document]) -> list[dict]:
     """Build structured source references for retrieved documents."""
-    sources = []
-    seen_sources = set()
+    seen_sources = {source_key(source) for source in sources}
 
     for document in documents:
         metadata = document.metadata
@@ -55,18 +63,12 @@ def build_sources(documents: list[Document]) -> list[dict]:
             if value is not None
         }
 
-        source_key = (
-            source.get("source"),
-            source.get("page"),
-            source.get("section"),
-            source.get("clause_number"),
-            source.get("question_number"),
-        )
+        key = source_key(source)
 
-        if source_key in seen_sources:
+        if key in seen_sources:
             continue
 
-        seen_sources.add(source_key)
+        seen_sources.add(key)
         sources.append(source)
 
     return sources
@@ -74,8 +76,10 @@ def build_sources(documents: list[Document]) -> list[dict]:
 
 async def document_agent(state: AgentState) -> dict:
     """Answer library policy questions using retrieved documents."""
-    tool_steps = state.get("tool_steps", 0) + 1
+    print("document_agent started")
+    agent_steps = state.get("agent_steps", 0) + 1
     execution_log = state.get("execution_log", [])
+    sources = state.get("sources", [])
     question = state["question"]
 
     try:
@@ -84,8 +88,8 @@ async def document_agent(state: AgentState) -> dict:
         if not documents:
             return {
                 "answer": "اطلاعات مرتبطی در اسناد کتابخانه پیدا نشد.",
-                "sources": [],
-                "tool_steps": tool_steps,
+                "sources": sources,
+                "agent_steps": agent_steps,
                 "execution_log": execution_log + [
                     "document_agent executed: no documents found"
                 ],
@@ -120,8 +124,8 @@ Answer in Persian:
 
         return {
             "answer": answer,
-            "sources": build_sources(documents),
-            "tool_steps": tool_steps,
+            "sources": build_sources(sources, documents),
+            "agent_steps": agent_steps,
             "execution_log": execution_log + [
                 "document_agent executed"
             ],
@@ -135,7 +139,7 @@ Answer in Persian:
                 "لطفاً دوباره تلاش کنید."
             ),
             "sources": [],
-            "tool_steps": tool_steps,
+            "agent_steps": agent_steps,
             "execution_log": execution_log + [
                 "document_agent failed"
             ],
