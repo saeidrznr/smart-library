@@ -29,6 +29,11 @@ services:
       depends_on:
         db:
           condition: service_healthy
+      volumes:
+        - hf_cache:/root/.cache/huggingface
+        - chroma_data:/app/data/chroma
 
 volumes:
   postgres_data:
+  hf_cache:
+  chroma_data:
